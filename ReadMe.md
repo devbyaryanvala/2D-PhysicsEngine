@@ -31,3 +31,22 @@ To build and run this engine, you will need:
 Open your terminal in the project root directory and run:
 ```bash
 make
+
+This command compiles the source files and links them against SDL2 to create `build/engine.exe`.
+
+### 2. Run the Application
+Launch the engine immediately after building with:
+
+```bash
+make run
+```
+
+### Controls
+* **Left Arrow Key**: Apply leftward force to the player box.
+* **Right Arrow Key**: Apply rightward force to the player box.
+* **Close Window**: Exit the application.
+
+### Technical Implementation Details
+* **Integration**: Acceleration is derived from force ($a = F/m$), and velocity is updated before the position update to maintain numerical stability.
+* **Static Bodies**: Bodies with an `invMass` of 0 are treated as static objects that remain stationary during integration.
+* **Friction and Restitution**: The simulation includes horizontal friction when touching surfaces and a restitution factor to control energy loss during collisions.
