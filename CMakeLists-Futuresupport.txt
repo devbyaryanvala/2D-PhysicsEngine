@@ -1,0 +1,23 @@
+cmake_minimum_required(VERSION 3.10)
+project(EnterprisePhysicsEngine C)
+
+set(CMAKE_C_STANDARD 99)
+
+include_directories(include)
+
+# SDL2 path configuration (Adjust based on your local machine)
+set(SDL2_PATH "C:/SDL2/i686-w64-mingw32")
+include_directories(${SDL2_PATH}/include)
+link_directories(${SDL2_PATH}/lib)
+
+set(SOURCES 
+    src/vec2.c 
+    src/body.c 
+    src/engine.c
+    src/collision_legacy.c
+)
+
+add_executable(physics_engine ${SOURCES})
+
+# Link libraries originally defined in your Makefile
+target_link_libraries(physics_engine mingw32 SDL2main SDL2 m)
