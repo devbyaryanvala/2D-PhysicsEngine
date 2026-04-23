@@ -58,6 +58,7 @@ typedef struct {
 
     Vec2 gravityScale; // Custom gravity vector scale, default (0, 1) or similar depending on world gravity
     bool useRK4;
+    int broadphaseId; // Used by BroadPhase BVH
 } Body;
 
 // Initializes a body with given parameters and calculates inverse mass and inertia for physics calculations

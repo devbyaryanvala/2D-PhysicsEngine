@@ -46,6 +46,7 @@ void body_init(Body* b, BodyType type, ShapeDef shape, float x, float y, float d
 
     b->gravityScale = (Vec2){0, 1.0f};
     b->useRK4 = false;
+    b->broadphaseId = -1;
 
     b->restitution = 0.5f; 
     b->staticFriction = 0.6f;
