@@ -33,10 +33,24 @@ float vec2_length(Vec2 v) {
 // Normalizes a vector to have a length of 1 (returns zero vector if length is zero)
 Vec2  vec2_normalize(Vec2 v) {
     float len = vec2_length(v);
-    // return (len > 0) ? vec2_scale(v, 1.0f / len) : (Vec2){0, 0};
     if (len > 0){
         return vec2_scale(v, 1.0f / len);
     } else {
         return (Vec2){0,0};
     }
+}
+
+// 2D Cross product of two vectors (returns scalar z-value in 3D)
+float vec2_cross(Vec2 a, Vec2 b) {
+    return a.x * b.y - a.y * b.x;
+}
+
+// Cross product of vector and scalar (returns vector)
+Vec2 vec2_cross_vs(Vec2 v, float s) {
+    return (Vec2){s * v.y, -s * v.x};
+}
+
+// Cross product of scalar and vector (returns vector)
+Vec2 vec2_cross_sv(float s, Vec2 v) {
+    return (Vec2){-s * v.y, s * v.x};
 }

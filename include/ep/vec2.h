@@ -13,4 +13,9 @@ float vec2_length_sq(Vec2 v);
 float vec2_length(Vec2 v);
 Vec2  vec2_normalize(Vec2 v);
 
+// 2D Cross products
+float vec2_cross(Vec2 a, Vec2 b);
+Vec2  vec2_cross_vs(Vec2 v, float s);
+Vec2  vec2_cross_sv(float s, Vec2 v);
+
 #endif

@@ -17,8 +17,10 @@ int main(int argc, char* argv[]) {
 
     // Initialize player and obstacle bodies
     Body player, obstacle;
-    body_init(&player, 2.0f, 1.0f, 1.0f, 1.0f, 2.0f);
-    body_init(&obstacle, 6.0f, 8.0f, 4.0f, 1.0f, 0.0f);
+    ShapeDef pShape = { .type = SHAPE_TYPE_RECT, .rect = {1.0f, 1.0f} };
+    body_init(&player, BODY_TYPE_DYNAMIC, pShape, 2.0f, 1.0f, 2.0f);
+    ShapeDef oShape = { .type = SHAPE_TYPE_RECT, .rect = {4.0f, 1.0f} };
+    body_init(&obstacle, BODY_TYPE_STATIC, oShape, 6.0f, 8.0f, 0.0f);
 
     // Main game loop
     int running = 1; SDL_Event event;
@@ -32,11 +34,10 @@ int main(int argc, char* argv[]) {
         const Uint8* ks = SDL_GetKeyboardState(NULL);
         if (ks[SDL_SCANCODE_LEFT]) body_apply_force(&player, (Vec2){-30.0f, 0});
         if (ks[SDL_SCANCODE_RIGHT]) body_apply_force(&player, (Vec2){30.0f, 0});
-        if (ks[SDL_SCANCODE_UP] && (player.position.y + player.height >= WORLD_HEIGHT_M - 0.1f)) player.velocity.y = -8.0f;
+        if (ks[SDL_SCANCODE_UP] && (player.position.y + player.shape.rect.height >= WORLD_HEIGHT_M - 0.1f)) player.velocity.y = -8.0f;
 
         // Apply gravity, integrate physics, and resolve collisions
-        body_apply_force(&player, (Vec2){0, GRAVITY_MS2 * player.mass});
-        body_integrate(&player, FIXED_DT);
+        body_integrate(&player, FIXED_DT, (Vec2){0, GRAVITY_MS2});
         collision_resolve_world_bounds(&player);
         if (collision_check_aabb(&player, &obstacle)) collision_resolve_aabb(&player, &obstacle);
 
@@ -48,8 +49,8 @@ int main(int argc, char* argv[]) {
         
 
         // Convert world coordinates to screen coordinates for rendering
-        SDL_Rect pR = { (int)METERS_TO_PIXELS(player.position.x), (int)METERS_TO_PIXELS(player.position.y), (int)METERS_TO_PIXELS(player.width), (int)METERS_TO_PIXELS(player.height) };
-        SDL_Rect oR = { (int)METERS_TO_PIXELS(obstacle.position.x), (int)METERS_TO_PIXELS(obstacle.position.y), (int)METERS_TO_PIXELS(obstacle.width), (int)METERS_TO_PIXELS(obstacle.height) };
+        SDL_Rect pR = { (int)METERS_TO_PIXELS(player.position.x), (int)METERS_TO_PIXELS(player.position.y), (int)METERS_TO_PIXELS(player.shape.rect.width), (int)METERS_TO_PIXELS(player.shape.rect.height) };
+        SDL_Rect oR = { (int)METERS_TO_PIXELS(obstacle.position.x), (int)METERS_TO_PIXELS(obstacle.position.y), (int)METERS_TO_PIXELS(obstacle.shape.rect.width), (int)METERS_TO_PIXELS(obstacle.shape.rect.height) };
         
 
         // Draw the player and obstacle rectangles
