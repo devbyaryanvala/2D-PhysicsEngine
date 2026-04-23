@@ -47,12 +47,15 @@ void body_init(Body* b, BodyType type, ShapeDef shape, float x, float y, float d
     b->gravityScale = (Vec2){0, 1.0f};
     b->useRK4 = false;
     b->broadphaseId = -1;
+    b->material = MATERIAL_DEFAULT;
 
-    b->restitution = 0.5f; 
-    b->staticFriction = 0.6f;
-    b->dynamicFriction = 0.4f;
-    b->linearDamping = 0.0f;
-    b->angularDamping = 0.01f;
+    // Pull physical properties from the default material table
+    const MaterialProps* mat = material_get(MATERIAL_DEFAULT);
+    b->restitution     = mat->restitution;
+    b->staticFriction  = mat->staticFriction;
+    b->dynamicFriction = mat->dynamicFriction;
+    b->linearDamping   = 0.0f;
+    b->angularDamping  = 0.01f;
 
     if (type == BODY_TYPE_STATIC || type == BODY_TYPE_KINEMATIC) {
         b->mass = 0.0f;
@@ -82,6 +85,15 @@ void body_init(Body* b, BodyType type, ShapeDef shape, float x, float y, float d
 void body_apply_force(Body* b, Vec2 f) {
     if (b->type != BODY_TYPE_DYNAMIC) return;
     b->force = vec2_add(b->force, f); 
+}
+
+// Sets the material and syncs physical properties from the material table
+void body_set_material(Body* b, MaterialType mat) {
+    b->material = mat;
+    const MaterialProps* props = material_get(mat);
+    b->restitution     = props->restitution;
+    b->staticFriction  = props->staticFriction;
+    b->dynamicFriction = props->dynamicFriction;
 }
 
 // Applies a torque to the body

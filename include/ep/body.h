@@ -2,6 +2,7 @@
 #define EP_BODY_H
 
 #include "vec2.h"
+#include "material.h"
 #include <stdbool.h>
 
 #define EP_MAX_POLYGON_VERTICES 8
@@ -58,11 +59,13 @@ typedef struct {
 
     Vec2 gravityScale; // Custom gravity vector scale, default (0, 1) or similar depending on world gravity
     bool useRK4;
-    int broadphaseId; // Used by BroadPhase BVH
+    int broadphaseId;    // Used by BroadPhase BVH
+    MaterialType material; // Physical material (drives friction, restitution, density)
 } Body;
 
 // Initializes a body with given parameters and calculates inverse mass and inertia for physics calculations
 void body_init(Body* b, BodyType type, ShapeDef shape, float x, float y, float density);
+void body_set_material(Body* b, MaterialType mat);
 void body_apply_force(Body* b, Vec2 f);
 void body_apply_torque(Body* b, float t);
 void body_integrate(Body* b, float dt, Vec2 worldGravity);
