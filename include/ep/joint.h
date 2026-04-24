@@ -39,9 +39,15 @@ typedef struct {
     float K[2][2];            // Effective mass matrix (inverted)
     Vec2  impulse;            // Accumulated linear impulse (warm-start)
     Vec2  biasVelocity;       // Baumgarte correction velocity (recomputed each frame)
-    float motorImpulse;
-    float limitImpulse;
+    float motorImpulse;       // Accumulated motor impulse
+    float motorMass;          // Effective mass for motor
+    float limitImpulse;       // Accumulated limit impulse
+    float limitMass;          // Effective mass for limits
+    int   limitState;         // 0: inactive, 1: lower, 2: upper
+    float limitBias;          // Baumgarte correction for limit penetration
 } RevoluteJointData;
+
+
 
 // ── Mouse Joint ────────────────────────────────────────────────────────────────
 typedef struct {
@@ -81,6 +87,12 @@ void joint_init_revolute(Joint* j, Body* a, Body* b, Vec2 worldAnchor);
 void joint_init_mouse(Joint* j, Body* b,
                        Vec2 localAnchor, Vec2 worldTarget,
                        float maxForce, float stiffness, float damping);
+
+void joint_revolute_enable_motor(Joint* j, bool flag);
+void joint_revolute_set_motor_speed(Joint* j, float speed);
+void joint_revolute_set_max_motor_torque(Joint* j, float torque);
+void joint_revolute_enable_limit(Joint* j, bool flag);
+void joint_revolute_set_limits(Joint* j, float lower, float upper);
 
 // ── Solver interface ──────────────────────────────────────────────────────────
 void joint_pre_solve(Joint* j, float dt);

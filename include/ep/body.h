@@ -61,13 +61,30 @@ typedef struct {
     bool useRK4;
     int broadphaseId;    // Used by BroadPhase BVH
     MaterialType material; // Physical material (drives friction, restitution, density)
+
+    // Sleep state
+    bool  isSleeping;
+    bool  allowSleep;
+    float sleepTime;
+    int   islandId;      // Internal use during island building
 } Body;
 
 // Initializes a body with given parameters and calculates inverse mass and inertia for physics calculations
 void body_init(Body* b, BodyType type, ShapeDef shape, float x, float y, float density);
+
+// Initializes a body with a custom convex polygon shape (vertices must be counter-clockwise)
+void body_init_polygon(Body* b, BodyType type, const Vec2* vertices, int vertexCount, float x, float y, float density);
+
+// Initializes a body with a regular polygon shape (e.g. pentagon, hexagon)
+void body_init_regular_polygon(Body* b, BodyType type, int sides, float radius, float x, float y, float density);
+
+// Computes the world-space vertices of the body's shape (applies to RECT and POLYGON)
+void body_get_world_vertices(const Body* b, Vec2* outVerts, int* outCount);
+
 void body_set_material(Body* b, MaterialType mat);
 void body_apply_force(Body* b, Vec2 f);
 void body_apply_torque(Body* b, float t);
 void body_integrate(Body* b, float dt, Vec2 worldGravity);
+void body_wake(Body* b);
 
 #endif

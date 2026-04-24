@@ -80,6 +80,37 @@ void joint_init_revolute(Joint* j, Body* a, Body* b, Vec2 worldAnchor) {
     j->revolute.referenceAngle = b->orientation - a->orientation;
 }
 
+void joint_revolute_enable_motor(Joint* j, bool flag) {
+    if (j->type == JOINT_REVOLUTE) {
+        j->revolute.enableMotor = flag;
+    }
+}
+
+void joint_revolute_set_motor_speed(Joint* j, float speed) {
+    if (j->type == JOINT_REVOLUTE) {
+        j->revolute.motorSpeed = speed;
+    }
+}
+
+void joint_revolute_set_max_motor_torque(Joint* j, float torque) {
+    if (j->type == JOINT_REVOLUTE) {
+        j->revolute.maxMotorTorque = torque;
+    }
+}
+
+void joint_revolute_enable_limit(Joint* j, bool flag) {
+    if (j->type == JOINT_REVOLUTE) {
+        j->revolute.enableLimits = flag;
+    }
+}
+
+void joint_revolute_set_limits(Joint* j, float lower, float upper) {
+    if (j->type == JOINT_REVOLUTE) {
+        j->revolute.lowerAngle = lower;
+        j->revolute.upperAngle = upper;
+    }
+}
+
 void joint_init_mouse(Joint* j, Body* b, Vec2 localAnchor, Vec2 worldTarget,
                        float maxForce, float stiffness, float damping) {
     memset(j, 0, sizeof(Joint));
@@ -184,16 +215,46 @@ static void revolute_pre_solve(Joint* j, float dt) {
         (BAUMGARTE_JOINT / dt) * C.y
     };
 
+    // Angular constraints effective mass
+    float invI = a->invInertia + b->invInertia;
+    
     // Motor effective mass
     if (r->enableMotor) {
-        float invI = a->invInertia + b->invInertia;
-        r->motorImpulse = (invI > 0) ? 1.0f/invI : 0.0f;
+        r->motorMass = (invI > 0) ? 1.0f / invI : 0.0f;
+    }
+
+    // Limit effective mass and Baumgarte bias
+    if (r->enableLimits) {
+        float angle = b->orientation - a->orientation - r->referenceAngle;
+        r->limitMass = (invI > 0) ? 1.0f / invI : 0.0f;
+        
+        if (angle <= r->lowerAngle) {
+            r->limitState = 1;
+            float C = angle - r->lowerAngle;
+            r->limitBias = (BAUMGARTE_JOINT / dt) * C;
+        } else if (angle >= r->upperAngle) {
+            r->limitState = 2;
+            float C = angle - r->upperAngle;
+            r->limitBias = (BAUMGARTE_JOINT / dt) * C;
+        } else {
+            r->limitState = 0;
+            r->limitImpulse = 0.0f;
+        }
     }
 
     // Warm-start: re-apply accumulated impulse from previous frame
     Vec2 P = r->impulse;
     apply_linear_impulse(a, P, rA, -1.0f);
     apply_linear_impulse(b, P, rB,  1.0f);
+    
+    if (r->enableMotor) {
+        if (a->type == BODY_TYPE_DYNAMIC) a->angularVelocity -= a->invInertia * r->motorImpulse;
+        if (b->type == BODY_TYPE_DYNAMIC) b->angularVelocity += b->invInertia * r->motorImpulse;
+    }
+    if (r->enableLimits && r->limitState != 0) {
+        if (a->type == BODY_TYPE_DYNAMIC) a->angularVelocity -= a->invInertia * r->limitImpulse;
+        if (b->type == BODY_TYPE_DYNAMIC) b->angularVelocity += b->invInertia * r->limitImpulse;
+    }
 }
 
 static void revolute_solve_velocity(Joint* j) {
@@ -225,13 +286,30 @@ static void revolute_solve_velocity(Joint* j) {
     // Motor constraint (independent of position constraint)
     if (r->enableMotor) {
         float relW = b->angularVelocity - a->angularVelocity - r->motorSpeed;
-        float motorLambda = -r->motorImpulse * relW;
+        float motorLambda = -r->motorMass * relW;
         float oldMotor = r->motorImpulse;
         float maxImpulse = r->maxMotorTorque;
         r->motorImpulse = fmaxf(-maxImpulse, fminf(oldMotor + motorLambda, maxImpulse));
         motorLambda = r->motorImpulse - oldMotor;
         if (a->type == BODY_TYPE_DYNAMIC) a->angularVelocity -= a->invInertia * motorLambda;
         if (b->type == BODY_TYPE_DYNAMIC) b->angularVelocity += b->invInertia * motorLambda;
+    }
+
+    // Limit constraint
+    if (r->enableLimits && r->limitState != 0) {
+        float relW = b->angularVelocity - a->angularVelocity;
+        float limitLambda = -r->limitMass * (relW + r->limitBias);
+        
+        float oldLimit = r->limitImpulse;
+        if (r->limitState == 1) { // Lower limit (can only push positive relative velocity)
+            r->limitImpulse = fmaxf(oldLimit + limitLambda, 0.0f);
+        } else if (r->limitState == 2) { // Upper limit (can only push negative relative velocity)
+            r->limitImpulse = fminf(oldLimit + limitLambda, 0.0f);
+        }
+        limitLambda = r->limitImpulse - oldLimit;
+        
+        if (a->type == BODY_TYPE_DYNAMIC) a->angularVelocity -= a->invInertia * limitLambda;
+        if (b->type == BODY_TYPE_DYNAMIC) b->angularVelocity += b->invInertia * limitLambda;
     }
 }
 

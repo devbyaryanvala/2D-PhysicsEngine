@@ -49,6 +49,12 @@ void body_init(Body* b, BodyType type, ShapeDef shape, float x, float y, float d
     b->broadphaseId = -1;
     b->material = MATERIAL_DEFAULT;
 
+    // Sleep state initialization
+    b->isSleeping = false;
+    b->allowSleep = true;
+    b->sleepTime = 0.0f;
+    b->islandId = -1;
+
     // Pull physical properties from the default material table
     const MaterialProps* mat = material_get(MATERIAL_DEFAULT);
     b->restitution     = mat->restitution;
@@ -81,10 +87,76 @@ void body_init(Body* b, BodyType type, ShapeDef shape, float x, float y, float d
     }
 }
 
+// Initializes a body with a custom convex polygon shape (vertices must be counter-clockwise)
+void body_init_polygon(Body* b, BodyType type, const Vec2* vertices, int vertexCount, float x, float y, float density) {
+    ShapeDef shape;
+    shape.type = SHAPE_TYPE_POLYGON;
+    shape.polygon.vertexCount = (vertexCount > EP_MAX_POLYGON_VERTICES) ? EP_MAX_POLYGON_VERTICES : vertexCount;
+    for (int i = 0; i < shape.polygon.vertexCount; i++) {
+        shape.polygon.vertices[i] = vertices[i];
+    }
+    // Normals can be calculated later if needed for SAT. 
+    // GJK/EPA doesn't need explicit normals, so we can leave them uninitialized for now.
+    
+    body_init(b, type, shape, x, y, density);
+}
+
+// Initializes a body with a regular polygon shape (e.g. pentagon, hexagon)
+void body_init_regular_polygon(Body* b, BodyType type, int sides, float radius, float x, float y, float density) {
+    if (sides < 3) sides = 3;
+    if (sides > EP_MAX_POLYGON_VERTICES) sides = EP_MAX_POLYGON_VERTICES;
+    
+    Vec2 vertices[EP_MAX_POLYGON_VERTICES];
+    float angleStep = 2.0f * M_PI / sides;
+    
+    // Generate vertices in CCW order
+    for (int i = 0; i < sides; i++) {
+        float angle = i * angleStep;
+        vertices[i] = (Vec2){ cosf(angle) * radius, sinf(angle) * radius };
+    }
+    
+    body_init_polygon(b, type, vertices, sides, x, y, density);
+}
+
+// Computes the world-space vertices of the body's shape
+void body_get_world_vertices(const Body* b, Vec2* outVerts, int* outCount) {
+    float c = cosf(b->orientation);
+    float s = sinf(b->orientation);
+    
+    if (b->shape.type == SHAPE_TYPE_RECT) {
+        *outCount = 4;
+        float hw = b->shape.rect.width * 0.5f;
+        float hh = b->shape.rect.height * 0.5f;
+        
+        Vec2 localVerts[4] = {
+            {-hw, -hh}, {hw, -hh}, {hw, hh}, {-hw, hh}
+        };
+        
+        for (int i = 0; i < 4; i++) {
+            outVerts[i] = (Vec2){ 
+                localVerts[i].x * c - localVerts[i].y * s + b->position.x,
+                localVerts[i].x * s + localVerts[i].y * c + b->position.y 
+            };
+        }
+    } else if (b->shape.type == SHAPE_TYPE_POLYGON) {
+        *outCount = b->shape.polygon.vertexCount;
+        for (int i = 0; i < *outCount; i++) {
+            Vec2 local = b->shape.polygon.vertices[i];
+            outVerts[i] = (Vec2){ 
+                local.x * c - local.y * s + b->position.x,
+                local.x * s + local.y * c + b->position.y 
+            };
+        }
+    } else {
+        *outCount = 0;
+    }
+}
+
 // Applies a force to the body
 void body_apply_force(Body* b, Vec2 f) {
     if (b->type != BODY_TYPE_DYNAMIC) return;
     b->force = vec2_add(b->force, f); 
+    body_wake(b);
 }
 
 // Sets the material and syncs physical properties from the material table
@@ -100,6 +172,15 @@ void body_set_material(Body* b, MaterialType mat) {
 void body_apply_torque(Body* b, float t) {
     if (b->type != BODY_TYPE_DYNAMIC) return;
     b->torque += t;
+    body_wake(b);
+}
+
+// Wakes up a sleeping body
+void body_wake(Body* b) {
+    if (b->allowSleep) {
+        b->isSleeping = false;
+        b->sleepTime = 0.0f;
+    }
 }
 
 // State struct for RK4
@@ -142,6 +223,11 @@ static Derivative evaluate(const Body* b, const State* initial, float dt, const 
 
 // Integrates the body's position and velocity over time
 void body_integrate(Body* b, float dt, Vec2 worldGravity) {
+    if (b->isSleeping) {
+        b->force = (Vec2){0, 0}; 
+        b->torque = 0;
+        return;
+    }
     if (b->type == BODY_TYPE_STATIC) {
         b->velocity = (Vec2){0,0};
         b->angularVelocity = 0;

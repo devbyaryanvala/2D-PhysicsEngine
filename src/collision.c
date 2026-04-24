@@ -22,30 +22,6 @@ float aabb_area(AABB a) {
     return 2.0f * (wx + wy);
 }
 
-static Vec2 transform_point(const Body* b, Vec2 p) {
-    float c = cosf(b->orientation);
-    float s = sinf(b->orientation);
-    return (Vec2){ p.x * c - p.y * s + b->position.x,
-                   p.x * s + p.y * c + b->position.y };
-}
-
-static void get_world_vertices(const Body* b, Vec2* outVerts, int* outCount) {
-    if (b->shape.type == SHAPE_TYPE_RECT) {
-        *outCount = 4;
-        float hw = b->shape.rect.width * 0.5f;
-        float hh = b->shape.rect.height * 0.5f;
-        outVerts[0] = transform_point(b, (Vec2){-hw, -hh});
-        outVerts[1] = transform_point(b, (Vec2){hw, -hh});
-        outVerts[2] = transform_point(b, (Vec2){hw, hh});
-        outVerts[3] = transform_point(b, (Vec2){-hw, hh});
-    } else if (b->shape.type == SHAPE_TYPE_POLYGON) {
-        *outCount = b->shape.polygon.vertexCount;
-        for (int i=0; i<*outCount; i++) {
-            outVerts[i] = transform_point(b, b->shape.polygon.vertices[i]);
-        }
-    }
-}
-
 void collision_compute_aabb(const Body* b, AABB* outAABB) {
     if (b->shape.type == SHAPE_TYPE_CIRCLE) {
         float r = b->shape.circle.radius;
@@ -54,7 +30,7 @@ void collision_compute_aabb(const Body* b, AABB* outAABB) {
     } else {
         Vec2 verts[EP_MAX_POLYGON_VERTICES];
         int count;
-        get_world_vertices(b, verts, &count);
+        body_get_world_vertices(b, verts, &count);
         outAABB->min = (Vec2){1e20f, 1e20f};
         outAABB->max = (Vec2){-1e20f, -1e20f};
         for (int i=0; i<count; ++i) {
@@ -109,8 +85,8 @@ static Vec2 get_shape_support(const Body* b, Vec2 dir) {
         Vec2 ndir = vec2_normalize(dir);
         return vec2_add(b->position, vec2_scale(ndir, b->shape.circle.radius));
     } else {
-        Vec2 verts[8]; int count;
-        get_world_vertices(b, verts, &count);
+        Vec2 verts[EP_MAX_POLYGON_VERTICES]; int count;
+        body_get_world_vertices(b, verts, &count);
         return support_poly(verts, count, dir);
     }
 }
@@ -261,9 +237,9 @@ static void extract_contacts(Body* a, Body* b, ContactManifold* m) {
         return;
     }
 
-    Vec2 vA[8], vB[8]; int cA, cB;
-    get_world_vertices(a, vA, &cA);
-    get_world_vertices(b, vB, &cB);
+    Vec2 vA[EP_MAX_POLYGON_VERTICES], vB[EP_MAX_POLYGON_VERTICES]; int cA, cB;
+    body_get_world_vertices(a, vA, &cA);
+    body_get_world_vertices(b, vB, &cB);
     
     Edge eA = best_edge(vA, cA, m->normal);
     Edge eB = best_edge(vB, cB, vec2_scale(m->normal, -1.0f));
