@@ -1,4 +1,8 @@
-build/
-*.exe
-*.dll
-*.o
+CMakeLists-Futuresupport.txt
+Upgrades_Report.md
+#CMakeLists-Futuresupport.txt
+#Upgrades_Report.md
+
+src/demo3.txt
+src/demo2.txt
+src/demo1.txt

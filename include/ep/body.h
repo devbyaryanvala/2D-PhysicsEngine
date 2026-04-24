@@ -67,6 +67,9 @@ typedef struct {
     bool  allowSleep;
     float sleepTime;
     int   islandId;      // Internal use during island building
+    
+    // CCD
+    bool  isBullet;
 } Body;
 
 // Initializes a body with given parameters and calculates inverse mass and inertia for physics calculations
@@ -82,6 +85,7 @@ void body_init_regular_polygon(Body* b, BodyType type, int sides, float radius, 
 void body_get_world_vertices(const Body* b, Vec2* outVerts, int* outCount);
 
 void body_set_material(Body* b, MaterialType mat);
+void body_set_bullet(Body* b, bool flag);
 void body_apply_force(Body* b, Vec2 f);
 void body_apply_torque(Body* b, float t);
 void body_integrate(Body* b, float dt, Vec2 worldGravity);

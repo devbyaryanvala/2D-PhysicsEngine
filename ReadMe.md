@@ -1,66 +1,65 @@
-# Modular 2D Physics Engine
+# 2D Physics Engine (ep)
 
-A modular, C-based 2D physics engine designed for high precision, scientific accuracy, and clean software architecture. This engine moves away from arbitrary pixel-based movement to a robust system grounded in real-world physical principles and **SI units (MKS)**.
+A modular, C-based 2D physics engine designed for high precision, scientific accuracy, and clean software architecture. This engine has been fully upgraded to support arbitrary convex polygons, advanced joint constraints, continuous collision detection, and performance-oriented broad-phase structures. It uses **SI units (MKS)**.
 
 ---
 
-## 🔬 Core Physics Concepts
+## 🔬 Core Architecture & Features
 
-### 1. Semi-Implicit Euler Integration
-The engine utilizes **Semi-Implicit Euler** (also known as symplectic Euler) to calculate the motion of bodies. Unlike standard Euler, this method updates velocity *before* position, providing significantly better energy conservation for stable simulations.
+### 1. Integration & Dynamics
+The engine utilizes **Semi-Implicit Euler** integration.
+- Supports complete linear and angular dynamics (Torque, Inertia).
+- Mass and Inertia tensors are correctly computed for arbitrary convex polygons and circles based on material density.
+- Configurable Material properties (Restitution, Static/Dynamic Friction).
 
-**The Equations of Motion:**
-1.  **Acceleration**: Derived from Newton's Second Law ($F=ma$):
+### 2. Advanced Collision Pipeline
+- **Broad-Phase (BVH)**: Dynamic Bounding Volume Hierarchy tree for O(log n) pair detection, drastically improving performance with large numbers of bodies.
+- **Narrow-Phase (GJK & EPA)**: Full implementation of the Gilbert-Johnson-Keerthi (GJK) algorithm for Boolean intersection, backed by the Expanding Polytope Algorithm (EPA) to extract exact penetration vectors and contact manifolds.
+- **Supported Shapes**: True Circles and Arbitrary Convex Polygons.
 
-    `aₙ = Fₙ × invMass`
-3.  **Velocity Update**: 
+### 3. Constraints & Solver
+- **Island Solver**: A Depth-First Search (DFS) graph builder automatically groups resting bodies into isolated "islands".
+- **Sleeping**: Islands that come to rest are put to sleep, bypassing integration and collision to save CPU cycles. Dynamic waking occurs upon interaction.
+- **Sequential Impulse Solver**: Solves friction and restitution across contact manifolds using accumulated impulses and warm-starting.
+- **Joint Constraints (Revolute/Pin)**: Fully featured hinge joints with configurable:
+  - **Motors**: Drive joints at specific speeds with max torque.
+  - **Limits**: Baumgarte-stabilized hard angular limits to restrict range of motion.
 
-    `vₙ₊₁ = vₙ + aₙ × Δt`
-5.  **Position Update**:
-
-    `pₙ₊₁ = pₙ + vₙ₊₁ × Δt`
-
-
-
-### 2. Linear and Rotational Dynamics
-Every physical object (`Body`) tracks both linear and angular states:
-* **Mass & Inertia**: Mass is calculated based on area and density ($\rho$). The **Moment of Inertia** ($I$) for rectangular bodies is calculated as:
-    $$I = \frac{1}{12} \cdot m \cdot (w^2 + h^2)$$
-* **Torque**: Rotational equivalent of force, used to change angular velocity.
-
-### 3. Collision System (AABB)
-The engine currently implements **Axis-Aligned Bounding Box** detection. 
-
-**Collision Condition:**
-Two bodies, $A$ and $B$, are colliding if:
-* $A_{minX} < B_{maxX}$ AND $A_{maxX} > B_{minX}$
-* $A_{minY} < B_{maxY}$ AND $A_{maxY} > B_{minY}$
-
-### 4. Collision Resolution
-When a collision is detected, the engine performs two steps:
-1.  **Positional Correction**: Moving bodies out of overlap to prevent "sinking."
-2.  **Impulse Reflection**: Reversing velocity based on the **Coefficient of Restitution** ($e$), which determines bounciness.
-    $$\vec{v}_{after} = \vec{v}_{before} \cdot -e$$
+### 4. Continuous Collision Detection (CCD)
+- Fast-moving bodies (like projectiles) can be tagged with an `isBullet` flag.
+- The engine runs a specialized sub-stepping CCD pass to prevent these objects from "tunneling" (ghosting) through thin static geometry.
 
 ---
 
 ## 📂 Project Structure
 
-The project follows a modular design to separate concerns and ensure maintainability:
-
 ```text
 2D Physics Engine/
 ├── include/ep/       # Public Headers (phys namespace)
-│   ├── config.h        # SI Units, Gravity, and World Constants
-│   ├── vec2.h          # Vector math (Dot products, Normalization)
-│   ├── body.h          # Physical state and Mass/Inertia logic
-│   └── collision.h     # AABB and World Boundary logic
-├── src/                # Implementation Files
-│   ├── vec2.c          # Linear algebra implementation
-│   ├── body.c          # Physics solver (Integration)
-│   ├── collision.c     # Narrowphase collision logic
-│   └── engine.c        # Main App, SDL2 Rendering, and Input
-└── Makefile            # Automated build script
+│   ├── config.h        # Constants
+│   ├── vec2.h          # Vector math
+│   ├── body.h          # Physical state, Geometry
+│   ├── collision.h     # GJK/EPA Narrowphase
+│   ├── broadphase.h    # BVH Tree
+│   ├── solver.h        # Sequential Impulse Solver
+│   ├── joint.h         # Constraint logic
+│   ├── island.h        # Island graph & sleeping
+│   ├── render.h        # Dependency-Free Bitmap Font Engine
+│   └── world.h         # High-level World API
+├── src/                # Implementation Files (Core Engine)
+│   └── ...             # Core C source files
+├── demos/              # Example Applications
+│   ├── demo0_blocks.c
+│   ├── demo1_pendulum.c
+│   ├── demo2_chain.c
+│   ├── demo3_stack_sleeping.c
+│   ├── demo4_polygons.c
+│   ├── demo5_motors_limits.c
+│   └── demo6_ccd.c
+├── build/              # Build Artifacts
+│   ├── obj/            # Compiled Engine Objects (.o)
+│   └── *.exe           # Compiled Demo Executables
+└── Makefile            # Build script
 ```
 
 ---
@@ -69,40 +68,30 @@ The project follows a modular design to separate concerns and ensure maintainabi
 
 ### Prerequisites
 * **C99 Compiler**: (GCC/MinGW)
-* **SDL2 Library**: Ensure SDL2 is installed. The default path is `C:/SDL2/i686-w64-mingw32`.
+* **SDL2 Library**: Default path is `C:/SDL2/i686-w64-mingw32`.
 
 ### Build Instructions
-1.  Open your terminal in the project root.
-2.  Run the build command:
-    ```bash
-    make
-    ```
-3.  Execute the engine:
-    ```bash
-    make run
-    ```
-
-
----
-
-## 🎮 Controls and Calibration
-
-### Controls
-* **Left/Right Arrows**: Apply horizontal forces to the player box.
-* **Up Arrow**: Jump (Triggered by an instantaneous velocity change).
-* **Window [X]**: Cleanly shuts down SDL2 and exits.
-
-### Calibration (SI Units)
-To maintain scientific accuracy, the engine uses a specific scaling factor:
-* **Scale**: **50 Pixels = 1 Meter**
-* **Gravity**: $9.80665\ m/s^2$ (Applied downward)
-* **Time Step**: Fixed at $1/60$ seconds ($60\text{Hz}$) for deterministic behavior.
+The engine is structured to compile into independent object files, which are then linked to the demos.
+1. Open your terminal in the project root.
+2. Run the master build command to compile the engine and all 7 executables:
+   ```bash
+   make
+   ```
+3. Run a specific demo by using the `make run` target and specifying the demo name:
+   ```bash
+   make run DEMO=demo6_ccd
+   ```
 
 ---
 
-## 🚀 Future Roadmap
-* **SAT (Separating Axis Theorem)**: To support rotated polygons.
-* **Spatial Hashing**: Broadphase optimization for thousands of objects.
-* **Constraints & Joints**: Implementation of springs and hinges.
+## 🎮 Included Demos
 
-How do you want to handle the next step? We can start implementing **Rotational Impulse** so objects tumble realistically, or we could add **Circle-to-Box** collision detection!
+The project includes 7 isolated demo applications in the `demos/` directory. Each demo features a **Real-Time OSD (On-Screen Display)** tracking physics stats (Velocity, Force, etc.) rendered natively without external font dependencies.
+
+* **`demo0_blocks`**: Basic AABB vs. Ground interactions.
+* **`demo1_pendulum`**: A simple revolute joint swinging under gravity.
+* **`demo2_chain`**: A multi-link chain of rigid bodies.
+* **`demo3_stack_sleeping`**: A tall stack of boxes that optimally fall asleep. Press SPACE to shoot a projectile and wake them up!
+* **`demo4_polygons`**: Complex shapes (triangles, hexagons, custom polygons) bouncing on a sloped surface.
+* **`demo5_motors_limits`**: A motorized, drivable car (WASD/Arrows) with circular wheels, and a limited-angle pendulum.
+* **`demo6_ccd`**: Compares a standard fast projectile against a CCD-enabled bullet hitting a thin wall.

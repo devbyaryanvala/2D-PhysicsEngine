@@ -55,6 +55,8 @@ void body_init(Body* b, BodyType type, ShapeDef shape, float x, float y, float d
     b->sleepTime = 0.0f;
     b->islandId = -1;
 
+    b->isBullet = false;
+
     // Pull physical properties from the default material table
     const MaterialProps* mat = material_get(MATERIAL_DEFAULT);
     b->restitution     = mat->restitution;
@@ -166,6 +168,10 @@ void body_set_material(Body* b, MaterialType mat) {
     b->restitution     = props->restitution;
     b->staticFriction  = props->staticFriction;
     b->dynamicFriction = props->dynamicFriction;
+}
+
+void body_set_bullet(Body* b, bool flag) {
+    b->isBullet = flag;
 }
 
 // Applies a torque to the body

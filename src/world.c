@@ -3,6 +3,7 @@
 #include "ep/collision.h"
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 World* world_create(Vec2 gravity) {
     World* world = (World*)malloc(sizeof(World));
@@ -45,8 +46,59 @@ static bool are_bodies_connected(Body* a, Body* b, Joint** joints, int jointCoun
 }
 
 void world_step(World* world, float dt) {
+    // 0. CCD Pass for Bullets
+    bool ccdStepped[EP_MAX_BODIES] = {false};
+    
+    for (int i = 0; i < world->bodyCount; i++) {
+        Body* b = world->bodies[i];
+        if (!b->isBullet || b->type != BODY_TYPE_DYNAMIC) continue;
+        
+        float dist = vec2_length(b->velocity) * dt;
+        if (dist > 0.5f) { // Tunneling threshold (0.5 meters)
+            int steps = (int)ceilf(dist / 0.5f);
+            float subDt = dt / steps;
+            
+            for (int s = 0; s < steps; s++) {
+                // Integrate just the bullet
+                body_integrate(b, subDt, world->gravity);
+                collision_resolve_world_bounds(b);
+                
+                // Narrow-phase against all static bodies
+                for (int j = 0; j < world->bodyCount; j++) {
+                    Body* other = world->bodies[j];
+                    if (other->type != BODY_TYPE_STATIC) continue;
+                    
+                    ContactManifold m;
+                    if (collision_narrow_phase(b, other, &m)) {
+                        // Resolve immediately!
+                        Vec2 normal = (m.bodyA == b) ? m.normal : vec2_scale(m.normal, -1.0f);
+                        
+                        float velAlongNormal = vec2_dot(b->velocity, normal);
+                        if (velAlongNormal > 0) continue;
+                        
+                        float e = fminf(b->restitution, other->restitution);
+                        float j_imp = -(1.0f + e) * velAlongNormal;
+                        j_imp /= b->invMass; // other is static (invMass=0)
+                        
+                        Vec2 impulse = vec2_scale(normal, j_imp);
+                        b->velocity = vec2_add(b->velocity, vec2_scale(impulse, b->invMass));
+                        
+                        // Positional correction
+                        float correctionMag = fmaxf(m.penetration - 0.01f, 0.0f) * 0.8f;
+                        b->position = vec2_add(b->position, vec2_scale(normal, correctionMag));
+                    }
+                }
+            }
+            
+            broadphase_update(world->broadphase, b);
+            ccdStepped[i] = true;
+        }
+    }
+
     // 1. Integrate velocities and update broadphase
     for (int i = 0; i < world->bodyCount; i++) {
+        if (ccdStepped[i]) continue; // Skip standard integration if CCD handled it
+        
         Body* b = world->bodies[i];
         body_integrate(b, dt, world->gravity);
         broadphase_update(world->broadphase, b);

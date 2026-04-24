@@ -5,18 +5,38 @@ CC = gcc
 CFLAGS = -Iinclude -IC:/SDL2/i686-w64-mingw32/include -Wall -std=c99
 LDFLAGS = -LC:/SDL2/i686-w64-mingw32/lib -lmingw32 -lSDL2main -lSDL2 -lm
 
-# Source files and output executable
+# Source files and objects
 SRC = $(wildcard src/*.c)
-OUT = build/physics_engine.exe
+OBJ = $(patsubst src/%.c, build/obj/%.o, $(SRC))
+
+# Demo files and executables
+DEMOS = $(wildcard demos/*.c)
+DEMO_BINS = $(patsubst demos/%.c, build/%.exe, $(DEMOS))
 
 # Default target
-all: prepare
-	$(CC) $(SRC) $(CFLAGS) -o $(OUT) $(LDFLAGS)
+all: prepare $(DEMO_BINS)
 
-# Create build directory if it doesn't exist
+# Compile engine source into object files
+build/obj/%.o: src/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Compile demos and link with engine objects
+build/%.exe: demos/%.c $(OBJ)
+	$(CC) $(CFLAGS) $< $(OBJ) -o $@ $(LDFLAGS)
+
+# Create build directories
 prepare:
 	@if not exist build mkdir build
+	@if not exist build\obj mkdir build\obj
 	
-# Clean target to remove build artifacts
+# Clean target
+clean:
+	@if exist build rmdir /s /q build
+
+# Run a specific demo (e.g., make run DEMO=demo6_ccd)
 run: all
-	./$(OUT)
+ifndef DEMO
+	@echo Please specify a demo to run. Example: make run DEMO=demo6_ccd
+else
+	.\build\$(DEMO).exe
+endif
